@@ -166,11 +166,11 @@
       const n = parseInt(str, 10);
       return Number.isFinite(n) ? n : null;
     }
-
-    if (window.PortalsSdk) {
+    // Assume PortalsSdk is present (no window checks)
+    try {
       PortalsSdk.setMessageListener((message) => {
         console.log("PORTALS MSG:", message);
-        document.getElementById('message-display').textContent = message;
+
         const parsed = parseStrictNumberString(message);
         if (parsed === null) {
           debugText.textContent = `Invalid numeric string: ${String(message)}`;
@@ -182,14 +182,9 @@
       });
 
       debugText.textContent = "Listening for SDK messages…";
-    } else {
-      // Fallback demo if opened without the SDK
-      debugText.textContent = "PortalsSdk not detected. Using demo updates.";
-      let demo = 0;
-      setInterval(() => {
-        demo = (demo + 25) % (MAX + 100);
-        setProgress(demo);
-      }, 600);
+    } catch (e) {
+      console.error(e);
+      debugText.textContent = "PortalsSdk not available.";
     }
 
     setProgress(0);
