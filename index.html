@@ -167,10 +167,10 @@
       return Number.isFinite(n) ? n : null;
     }
 
-    if (window.PortalsSdk && typeof PortalsSdk.setMessageListener === 'function') {
+    if (window.PortalsSdk) {
       PortalsSdk.setMessageListener((message) => {
         console.log("PORTALS MSG:", message);
-
+        document.getElementById('message-display').textContent = message;
         const parsed = parseStrictNumberString(message);
         if (parsed === null) {
           debugText.textContent = `Invalid numeric string: ${String(message)}`;
