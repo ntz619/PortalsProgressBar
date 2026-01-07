@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Game UI Progress Bar</title>
+
+  <!-- Portals SDK -->
+  <script src="https://portals-labs.github.io/portals-sdk/portals-sdk.js?v=10005456"></script>
+
+  <style>
+    :root {
+      --w: 520px;
+      --h: 34px;
+      --radius: 999px;
+      --border: rgba(255,255,255,0.22);
+      --bg: rgba(0,0,0,0.35);
+      --fill: rgba(255,255,255,0.90);
+      --text: rgba(255,255,255,0.95);
+      --shadow: rgba(0,0,0,0.55);
+    }
+
+    html, body {
+      height: 100%;
+      margin: 0;
+      background: transparent;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      color: var(--text);
+    }
+
+    .wrap {
+      height: 100%;
+      display: grid;
+      place-items: center;
+      padding: 16px;
+      box-sizing: border-box;
+    }
+
+    .bar {
+      width: min(var(--w), 92vw);
+      height: var(--h);
+      position: relative;
+      border-radius: var(--radius);
+      background: var(--bg);
+      border: 1px solid var(--border);
+      overflow: hidden;
+      box-shadow: 0 10px 24px rgba(0,0,0,0.25);
+      transform: translateZ(0);
+    }
+
+    .fill {
+      position: absolute;
+      inset: 0 auto 0 0;
+      width: 0%;
+      background: var(--fill);
+      border-radius: var(--radius);
+      transition: width 450ms cubic-bezier(.2,.8,.2,1);
+      will-change: width, transform, filter;
+    }
+
+    .value {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      font-weight: 800;
+      letter-spacing: 0.2px;
+      font-size: 14px;
+      line-height: 1;
+      user-select: none;
+      pointer-events: none;
+
+      /* Always readable */
+      color: rgba(255,255,255,0.98);
+      text-shadow:
+        0 2px 8px var(--shadow),
+        0 0 1px rgba(0,0,0,0.9),
+        0 0 10px rgba(0,0,0,0.35);
+      mix-blend-mode: difference;
+    }
+
+    .sub {
+      margin-top: 10px;
+      opacity: 0.8;
+      font-size: 12px;
+      text-align: center;
+    }
+
+    .bar.full .fill {
+      animation: fullPulse 900ms ease-out 1;
+      filter: drop-shadow(0 0 10px rgba(255,255,255,0.25));
+    }
+    .bar.full {
+      animation: fullPop 650ms cubic-bezier(.2,.8,.2,1) 1;
+    }
+
+    @keyframes fullPop {
+      0%   { transform: scale(1); }
+      35%  { transform: scale(1.04); }
+      70%  { transform: scale(0.99); }
+      100% { transform: scale(1); }
+    }
+
+    @keyframes fullPulse {
+      0%   { transform: scaleX(1); }
+      40%  { transform: scaleX(1.01); }
+      100% { transform: scaleX(1); }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <div class="bar" id="bar" role="progressbar" aria-valuemin="0" aria-valuemax="500" aria-valuenow="0">
+      <div class="fill" id="fill"></div>
+      <div class="value" id="valueText">0 / 500</div>
+    </div>
+    <div class="sub" id="debugText">Waiting for SDK message…</div>
+  </div>
+
+  <script>
+    const MIN = 0;
+    const MAX = 500;
+
+    const bar = document.getElementById('bar');
+    const fill = document.getElementById('fill');
+    const valueText = document.getElementById('valueText');
+    const debugText = document.getElementById('debugText');
+
+    let wasFull = false;
+
+    function clamp(n, min, max) {
+      return Math.max(min, Math.min(max, n));
+    }
+
+    function setProgress(value) {
+      const v = clamp(value, MIN, MAX);
+      const pct = (v / MAX) * 100;
+
+      fill.style.width = pct.toFixed(2) + '%';
+      valueText.textContent = `${v} / ${MAX}`;
+      bar.setAttribute('aria-valuenow', String(v));
+
+      const isFull = (v >= MAX);
+
+      // Play "full" animation only when crossing into full
+      if (isFull && !wasFull) {
+        bar.classList.remove('full');
+        void bar.offsetWidth; // restart animation reliably
+        bar.classList.add('full');
+      }
+
+      if (bar.classList.contains('full')) {
+        clearTimeout(setProgress._t);
+        setProgress._t = setTimeout(() => bar.classList.remove('full'), 1000);
+      }
+
+      wasFull = isFull;
+    }
+
+    // Strict numeric string parser (e.g., "123")
+    function parseStrictNumberString(message) {
+      const str = String(message).trim();
+      // Optional: allow leading +/-, remove if you only want unsigned
+      if (!/^[+-]?\d+$/.test(str)) return null;
+      const n = parseInt(str, 10);
+      return Number.isFinite(n) ? n : null;
+    }
+
+    if (window.PortalsSdk && typeof PortalsSdk.setMessageListener === 'function') {
+      PortalsSdk.setMessageListener((message) => {
+        console.log("PORTALS MSG:", message);
+
+        const parsed = parseStrictNumberString(message);
+        if (parsed === null) {
+          debugText.textContent = `Invalid numeric string: ${String(message)}`;
+          return;
+        }
+
+        debugText.textContent = `Last value: ${parsed}`;
+        setProgress(parsed);
+      });
+
+      debugText.textContent = "Listening for SDK messages…";
+    } else {
+      // Fallback demo if opened without the SDK
+      debugText.textContent = "PortalsSdk not detected. Using demo updates.";
+      let demo = 0;
+      setInterval(() => {
+        demo = (demo + 25) % (MAX + 100);
+        setProgress(demo);
+      }, 600);
+    }
+
+    setProgress(0);
+  </script>
+</body>
+</html>
